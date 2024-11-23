@@ -1,0 +1,11 @@
+{
+  "name": "radao-api-docs",
+  "version": "1.0.0",
+  "description": "Radao API Documentation",
+  "scripts": {
+    "build": "mkdir -p dist && cp index.html dist/ && cp swagger.yaml dist/"
+  },
+  "dependencies": {
+    "swagger-ui-dist": "^5.9.0"
+  }
+}

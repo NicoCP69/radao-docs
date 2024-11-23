@@ -1,0 +1,1150 @@
+swagger: '2.0'
+info:
+  title: Radao Complete API
+  description: |
+    Complete API documentation for the Radao ecosystem.
+    
+    Components:
+    - Lock: Token locking and management system
+    - Market: Primary market and fee distribution
+    - Staker: Staking and rewards system
+    - Token: ERC20 token implementation
+    
+    Features:
+    - Token deployment and management
+    - Lock/Unlock mechanism
+    - Primary market operations
+    - Staking and rewards
+    - Fee distribution
+    - Role-based access control
+  version: '2.0.0'
+host: api.radao.io
+basePath: /v1
+schemes:
+  - https
+produces:
+  - application/json
+consumes:
+  - application/json
+
+securityDefinitions:
+  web3Auth:
+    type: apiKey
+    in: header
+    name: X-Web3-Signature
+  walletAuth:
+    type: apiKey
+    in: header
+    name: X-Wallet-Address
+
+paths:
+  # Lock API Paths
+  /lock/deploy:
+    post:
+      tags:
+        - Lock
+      summary: Deploy full token set
+      description: |
+        Creates new Security, DAO, and ART tokens.
+        Requires admin role.
+        Names will be suffixed with token type:
+          - Security: "{name} - Security" / "{symbol}.S"
+          - DAO: "{name} - Decentralized Autonomous Organization" / "{symbol}.DAO"
+          - ART: "{name} - Asset Referenced Token" / "{symbol}.ART"
+      parameters:
+        - in: body
+          name: deployParams
+          required: true
+          schema:
+            $ref: '#/definitions/DeployParams'
+      responses:
+        200:
+          description: Tokens deployed successfully
+          schema:
+            $ref: '#/definitions/ContractsInfo'
+        400:
+          description: Symbol already exists
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/deployART:
+    post:
+      tags:
+        - Lock
+      summary: Deploy standalone ART token
+      description: |
+        Creates only an ART token without Security and DAO tokens.
+        Requires admin role.
+      parameters:
+        - in: body
+          name: deployParams
+          required: true
+          schema:
+            $ref: '#/definitions/DeployParams'
+      responses:
+        200:
+          description: ART token deployed successfully
+          schema:
+            type: object
+            properties:
+              art:
+                $ref: '#/definitions/Address'
+        400:
+          description: Symbol already exists
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/exists/{symbol}:
+    get:
+      tags:
+        - Lock
+      summary: Check symbol existence
+      description: Verifies if a symbol is already in use
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          type: string
+      responses:
+        200:
+          description: Existence check result
+          schema:
+            type: boolean
+
+  /lock/contracts/{symbol}:
+    get:
+      tags:
+        - Lock
+      summary: Get contracts for symbol
+      description: Get addresses of all tokens in a set
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          type: string
+      responses:
+        200:
+          description: Contract addresses
+          schema:
+            $ref: '#/definitions/ContractsInfo'
+        404:
+          description: Unknown symbol
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/setName:
+    post:
+      tags:
+        - Lock
+      summary: Update token set names
+      description: |
+        Updates names and symbols for all tokens in a set.
+        Requires admin role.
+        Suffixes will be maintained.
+      parameters:
+        - in: body
+          name: nameParams
+          required: true
+          schema:
+            $ref: '#/definitions/NameUpdateParams'
+      responses:
+        200:
+          description: Names updated successfully
+        400:
+          description: Unknown symbol
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/lock:
+    post:
+      tags:
+        - Lock
+      summary: Lock security tokens
+      description: |
+        Locks security tokens to receive DAO and ART tokens.
+        Requires security token approval.
+        Emits Lock event.
+      parameters:
+        - in: body
+          name: lockParams
+          required: true
+          schema:
+            $ref: '#/definitions/LockParams'
+      responses:
+        200:
+          description: Tokens locked successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Lock failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/unlock:
+    post:
+      tags:
+        - Lock
+      summary: Unlock security tokens
+      description: |
+        Burns DAO and ART tokens to retrieve security tokens.
+        Requires DAO and ART token approval.
+        Emits Unlock event.
+      parameters:
+        - in: body
+          name: unlockParams
+          required: true
+          schema:
+            $ref: '#/definitions/UnlockParams'
+      responses:
+        200:
+          description: Tokens unlocked successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Unlock failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  # Market API Paths
+  /market/initialize:
+    post:
+      tags:
+        - Market
+      summary: Initialize market
+      description: |
+        Initialize the primary market contract.
+        Can only be called once.
+      parameters:
+        - in: body
+          name: initParams
+          required: true
+          schema:
+            type: object
+            required:
+              - deployer
+            properties:
+              deployer:
+                $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Market initialized successfully
+        400:
+          description: Already initialized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /market/setIssuer:
+    post:
+      tags:
+        - Market
+      summary: Set issuer address
+      description: |
+        Set the market issuer address.
+        Requires owner role.
+        Emits RightsGranted event.
+      parameters:
+        - in: body
+          name: issuerParams
+          required: true
+          schema:
+            type: object
+            properties:
+              issuer:
+                $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Issuer set successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Invalid address
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /market/setArtToken:
+    post:
+      tags:
+        - Market
+      summary: Set ART token
+      description: |
+        Set the ART token address.
+        Requires issuer role.
+      parameters:
+        - in: body
+          name: tokenParams
+          required: true
+          schema:
+            type: object
+            properties:
+              artToken:
+                $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: ART token set successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Invalid address
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /market/configure/radao:
+    post:
+      tags:
+        - Market
+      summary: Configure Radao fees
+      description: |
+        Set Radao wallet and fee percentage.
+        Requires owner role.
+        Maximum fee is 5%.
+        Emits ConfigurationUpdated event.
+      parameters:
+        - in: body
+          name: config
+          required: true
+          schema:
+            $ref: '#/definitions/FeeConfig'
+      responses:
+        200:
+          description: Configuration updated successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Invalid configuration
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /market/configure/issuer:
+    post:
+      tags:
+        - Market
+      summary: Configure issuer fees
+      description: |
+        Set issuer wallet and fee percentage.
+        Requires issuer role.
+        Maximum fee is 5%.
+        Emits ConfigurationUpdated event.
+      parameters:
+        - in: body
+          name: config
+          required: true
+          schema:
+            $ref: '#/definitions/FeeConfig'
+      responses:
+        200:
+          description: Configuration updated successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Invalid configuration
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /market/configure/builder:
+    post:
+      tags:
+        - Market
+      summary: Configure builder fees
+      description: |
+        Set builder fee configuration.
+        Requires authorized builder.
+        Maximum fee is 5%.
+        Emits ConfigurationUpdated event.
+      parameters:
+        - in: body
+          name: config
+          required: true
+          schema:
+            $ref: '#/definitions/FeeConfig'
+      responses:
+        200:
+          description: Configuration updated successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Invalid configuration
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /market/configure/distributor:
+    post:
+      tags:
+        - Market
+      summary: Configure distributor fees
+      description: |
+        Set distributor fee configuration.
+        Requires authorized distributor.
+        Maximum fee is 5%.
+        Emits ConfigurationUpdated event.
+      parameters:
+        - in: body
+          name: config
+          required: true
+          schema:
+            $ref: '#/definitions/FeeConfig'
+      responses:
+        200:
+          description: Configuration updated successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Invalid configuration
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /market/payment/eure:
+    post:
+      tags:
+        - Market
+      summary: Process EURE payment
+      description: |
+        Process EURE payment with fee distribution.
+        Contract must not be paused.
+        Emits multiple FeePaid events.
+      parameters:
+        - in: body
+          name: payment
+          required: true
+          schema:
+            type: object
+            properties:
+              amount:
+                $ref: '#/definitions/Wei'
+      responses:
+        200:
+          description: Payment processed successfully
+          schema:
+            $ref: '#/definitions/PaymentResponse'
+        400:
+          description: Payment failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  /market/payment/art:
+    post:
+      tags:
+        - Market
+      summary: Process ART payment
+      description: |
+        Process ART token payment.
+        Contract must not be paused.
+        ART token must be configured.
+        Emits TokensTransferred event.
+      parameters:
+        - in: body
+          name: payment
+          required: true
+          schema:
+            type: object
+            properties:
+              amount:
+                $ref: '#/definitions/Wei'
+      responses:
+        200:
+          description: Payment processed successfully
+          schema:
+            $ref: '#/definitions/PaymentResponse'
+        400:
+          description: Payment failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  # Staker API Paths
+  /staker/deploy:
+    post:
+      tags:
+        - Staker
+      summary: Deploy staking contract
+      description: |
+        Creates new staked token contract for an original token.
+        stToken name will be "Radao Staked Token: {original name}"
+        stToken symbol will be "st{original symbol}"
+        Emits Deploy event.
+      parameters:
+        - in: body
+          name: deployParams
+          required: true
+          schema:
+            type: object
+            required:
+              - token
+            properties:
+              token:
+                $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Staking contract deployed
+          schema:
+            $ref: '#/definitions/DeployResponse'
+        400:
+          description: Already deployed or invalid token
+          schema:
+            $ref: '#/definitions/Error'
+
+  /staker/staking/{token}:
+    get:
+      tags:
+        - Staker
+      summary: Get staking information
+      description: Returns current staking state for a token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Staking information
+          schema:
+            $ref: '#/definitions/StakingInfo'
+        404:
+          description: Token not found
+          schema:
+            $ref: '#/definitions/Error'
+
+  /staker/convertToStaked:
+    get:
+      tags:
+        - Staker
+      summary: Calculate staked token amount
+      description: |
+        Calculate how many staked tokens would be received.
+        Uses current staking ratio.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+        - name: amount
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Wei'
+      responses:
+        200:
+          description: Conversion result
+          schema:
+            $ref: '#/definitions/ConversionResult'
+        404:
+          description: Token not found
+          schema:
+            $ref: '#/definitions/Error'
+
+  /staker/convertFromStaked:
+    get:
+      tags:
+        - Staker
+      summary: Calculate original token amount
+      description: |
+        Calculate how many original tokens would be received.
+        Uses current staking ratio.
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+        - name: stakedAmount
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Wei'
+      responses:
+        200:
+          description: Conversion result
+          schema:
+            $ref: '#/definitions/ConversionResult'
+        404:
+          description: Token not found
+          schema:
+            $ref: '#/definitions/Error'
+
+  /staker/stake:
+    post:
+      tags:
+        - Staker
+      summary: Stake tokens
+      description: |
+        Stake original tokens to receive staked tokens.
+        Requires token approval.
+        Amount of staked tokens depends on current ratio.
+        Emits Stake event.
+      parameters:
+        - in: body
+          name: stakeParams
+          required: true
+          schema:
+            type: object
+            required:
+              - token
+              - tokenValue
+              - stArtsRecipient
+            properties:
+              token:
+                $ref: '#/definitions/Address'
+              tokenValue:
+                $ref: '#/definitions/Wei'
+              stArtsRecipient:
+                $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Successfully staked
+          schema:
+            $ref: '#/definitions/StakeResult'
+        400:
+          description: Stake failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  /staker/unstake:
+    post:
+      tags:
+        - Staker
+      summary: Unstake tokens
+      description: |
+        Burn staked tokens to receive original tokens.
+        Requires staked token approval.
+        Amount of original tokens depends on current ratio.
+        Emits Unstake event.
+      parameters:
+        - in: body
+          name: unstakeParams
+          required: true
+          schema:
+            type: object
+            required:
+              - token
+              - stakedTokenValue
+              - artRecipient
+            properties:
+              token:
+                $ref: '#/definitions/Address'
+              stakedTokenValue:
+                $ref: '#/definitions/Wei'
+              artRecipient:
+                $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Successfully unstaked
+          schema:
+            $ref: '#/definitions/UnstakeResult'
+        400:
+          description: Unstake failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  /staker/reward:
+    post:
+      tags:
+        - Staker
+      summary: Add rewards
+      description: |
+        Add reward tokens to staking pool.
+        Increases value of all staked tokens.
+        Requires token approval.
+        Emits Reward event.
+      parameters:
+        - in: body
+          name: rewardParams
+          required: true
+          schema:
+            type: object
+            required:
+              - token
+              - tokenValue
+            properties:
+              token:
+                $ref: '#/definitions/Address'
+              tokenValue:
+                $ref: '#/definitions/Wei'
+      responses:
+        200:
+          description: Rewards added successfully
+          schema:
+            $ref: '#/definitions/RewardResult'
+        400:
+          description: Reward addition failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  # Token API Paths
+  /token/initialize:
+    post:
+      tags:
+        - Token
+      summary: Initialize new token
+      description: |
+        Initialize a new token with specified parameters.
+        Can only be called once per token contract.
+      parameters:
+        - in: body
+          required: true
+          name: initializeParams
+          schema:
+            type: object
+            properties:
+              decimals:
+                type: integer
+                example: 18
+              defaultAdmin:
+                $ref: '#/definitions/Address'
+              radao:
+                $ref: '#/definitions/Address'
+              isRadaoSupplier:
+                type: boolean
+                description: If true, Radao gets SUPPLY_ROLE
+      responses:
+        200:
+          description: Token initialized successfully
+        400:
+          description: Already initialized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /token/info/{address}:
+    get:
+      tags:
+        - Token
+      summary: Get token information
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Token information
+          schema:
+            $ref: '#/definitions/TokenInfo'
+        404:
+          description: Token not found
+          schema:
+            $ref: '#/definitions/Error'
+
+  /token/transfer:
+    post:
+      tags:
+        - Token
+      summary: Transfer tokens
+      description: Transfer tokens to another address
+      parameters:
+        - in: body
+          required: true
+          name: transferParams
+          schema:
+            type: object
+            properties:
+              address:
+                $ref: '#/definitions/Address'
+              to:
+                $ref: '#/definitions/Address'
+              amount:
+                $ref: '#/definitions/Wei'
+      responses:
+        200:
+          description: Transfer successful
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Transfer failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  /token/approve:
+    post:
+      tags:
+        - Token
+      summary: Approve spender
+      description: Approve address to spend tokens
+      parameters:
+        - in: body
+          required: true
+          name: approveParams
+          schema:
+            type: object
+            properties:
+              address:
+                $ref: '#/definitions/Address'
+              spender:
+                $ref: '#/definitions/Address'
+              amount:
+                $ref: '#/definitions/Wei'
+      responses:
+        200:
+          description: Approval successful
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Approval failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  /token/allowance:
+    get:
+      tags:
+        - Token
+      summary: Get token allowance
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+        - name: owner
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+        - name: spender
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Current allowance
+          schema:
+            type: object
+            properties:
+              allowance:
+                $ref: '#/definitions/Wei'
+
+  /token/permit:
+    post:
+      tags:
+        - Token
+      summary: Submit permit signature
+      description: EIP-2612 permit for gasless approvals
+      parameters:
+        - in: body
+          required: true
+          name: permitParams
+          schema:
+            $ref: '#/definitions/PermitRequest'
+      responses:
+        200:
+          description: Permit successful
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Invalid permit
+          schema:
+            $ref: '#/definitions/Error'
+
+definitions:
+  Address:
+    type: string
+    pattern: "^0x[a-fA-F0-9]{40}$"
+    example: "0x1234567890123456789012345678901234567890"
+
+  Wei:
+    type: string
+    pattern: "^[0-9]+$"
+    example: "1000000000000000000"
+    description: Amount in wei (18 decimals)
+
+  Error:
+    type: object
+    properties:
+      code:
+        type: string
+        example: "UNAUTHORIZED"
+      message:
+        type: string
+        example: "Not authorized"
+      details:
+        type: object
+        description: Additional error context
+
+  DeployParams:
+    type: object
+    required:
+      - decimals
+      - name
+      - symbol
+      - defaultAdmin
+    properties:
+      decimals:
+        type: integer
+        example: 18
+        minimum: 0
+        maximum: 77
+      name:
+        type: string
+        example: "Radao Test Token"
+        minLength: 1
+      symbol:
+        type: string
+        example: "RTT"
+        minLength: 1
+      defaultAdmin:
+        $ref: '#/definitions/Address'
+
+  ContractsInfo:
+    type: object
+    properties:
+      security:
+        $ref: '#/definitions/Address'
+      dao:
+        $ref: '#/definitions/Address'
+      art:
+        $ref: '#/definitions/Address'
+
+  NameUpdateParams:
+    type: object
+    required:
+      - symbol
+      - newName
+      - newSymbol
+    properties:
+      symbol:
+        type: string
+        example: "RTT"
+      newName:
+        type: string
+        example: "New Token Name"
+      newSymbol:
+        type: string
+        example: "NTN"
+
+  LockParams:
+    type: object
+    required:
+      - symbol
+      - value
+      - daoRecipient
+      - artRecipient
+    properties:
+      symbol:
+        type: string
+        example: "RTT"
+      value:
+        $ref: '#/definitions/Wei'
+      daoRecipient:
+        $ref: '#/definitions/Address'
+      artRecipient:
+        $ref: '#/definitions/Address'
+
+  UnlockParams:
+    type: object
+    required:
+      - symbol
+      - value
+      - securityRecipient
+    properties:
+      symbol:
+        type: string
+        example: "RTT"
+      value:
+        $ref: '#/definitions/Wei'
+      securityRecipient:
+        $ref: '#/definitions/Address'
+
+  FeeConfig:
+    type: object
+    required:
+      - wallet
+      - feePercentage
+    properties:
+      wallet:
+        $ref: '#/definitions/Address'
+      feePercentage:
+        type: integer
+        minimum: 0
+        maximum: 500
+        description: Fee percentage (base 10000, max 500 = 5%)
+        example: 250
+
+  PaymentResponse:
+    type: object
+    properties:
+      transactionHash:
+        type: string
+      fees:
+        type: array
+        items:
+          type: object
+          properties:
+            recipient:
+              $ref: '#/definitions/Address'
+            amount:
+              $ref: '#/definitions/Wei'
+            type:
+              type: string
+              enum: [DISTRIBUTOR, ISSUER, BUILDER, RADAO]
+      remaining:
+        $ref: '#/definitions/Wei'
+
+  StakingInfo:
+    type: object
+    properties:
+      stakedToken:
+        $ref: '#/definitions/Address'
+      totalToken:
+        $ref: '#/definitions/Wei'
+      totalStakedToken:
+        $ref: '#/definitions/Wei'
+      exchangeRate:
+        type: string
+        description: Current token/staked token ratio
+        example: "1.05"
+
+  ConversionResult:
+    type: object
+    properties:
+      stakedToken:
+        $ref: '#/definitions/Address'
+      stakedTokenValue:
+        $ref: '#/definitions/Wei'
+      tokenValue:
+        $ref: '#/definitions/Wei'
+      totalToken:
+        $ref: '#/definitions/Wei'
+      totalStakedToken:
+        $ref: '#/definitions/Wei'
+
+  StakeResult:
+    type: object
+    properties:
+      stakedToken:
+        $ref: '#/definitions/Address'
+      stakedTokenValue:
+        $ref: '#/definitions/Wei'
+      totalToken:
+        $ref: '#/definitions/Wei'
+      totalStakedToken:
+        $ref: '#/definitions/Wei'
+      transactionHash:
+        type: string
+        example: "0x123..."
+
+  UnstakeResult:
+    type: object
+    properties:
+      stakedToken:
+        $ref: '#/definitions/Address'
+      tokenValue:
+        $ref: '#/definitions/Wei'
+      totalToken:
+        $ref: '#/definitions/Wei'
+      totalStakedToken:
+        $ref: '#/definitions/Wei'
+      transactionHash:
+        type: string
+        example: "0x123..."
+
+  RewardResult:
+    type: object
+    properties:
+      stakedToken:
+        $ref: '#/definitions/Address'
+      totalToken:
+        $ref: '#/definitions/Wei'
+      totalStakedToken:
+        $ref: '#/definitions/Wei'
+      transactionHash:
+        type: string
+        example: "0x123..."
+
+  TokenInfo:
+    type: object
+    properties:
+      address:
+        $ref: '#/definitions/Address'
+      name:
+        type: string
+        example: "Radao Token"
+      symbol:
+        type: string
+        example: "RDAO"
+      decimals:
+        type: integer
+        example: 18
+      totalSupply:
+        $ref: '#/definitions/Wei'
+      paused:
+        type: boolean
+      radao:
+        $ref: '#/definitions/Address'
+
+  PermitRequest:
+    type: object
+    properties:
+      address:
+        $ref: '#/definitions/Address'
+      owner:
+        $ref: '#/definitions/Address'
+      spender:
+        $ref: '#/definitions/Address'
+      value:
+        $ref: '#/definitions/Wei'
+      deadline:
+        type: integer
+        format: int64
+        description: Unix timestamp
+      v:
+        type: integer
+      r:
+        type: string
+        pattern: "^0x[a-fA-F0-9]{64}$"
+      s:
+        type: string
+        pattern: "^0x[a-fA-F0-9]{64}$"
+
+  TransactionResponse:
+    type: object
+    properties:
+      transactionHash:
+        type: string
+        example: "0x123..."
+      status:
+        type: boolean
+        description: true if transaction succeeded
+
+  DeployResponse:
+    type: object
+    properties:
+      stakedToken:
+        $ref: '#/definitions/Address'
+      transactionHash:
+        type: string
+        example: "0x123..."
