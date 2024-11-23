@@ -5,15 +5,15 @@ info:
     Complete API documentation for the Radao ecosystem.
     
     Components:
-    - Lock: Token locking and management system
-    - Market: Primary market and fee distribution
-    - Staker: Staking and rewards system
-    - Token: ERC20 token implementation
+    1. Token: ERC20 token implementation
+    2. Market: Primary market and fee distribution
+    3. Lock: Token locking and management system
+    4. Staker: Staking and rewards system
     
     Features:
     - Token deployment and management
-    - Lock/Unlock mechanism
     - Primary market operations
+    - Lock/Unlock mechanism
     - Staking and rewards
     - Fee distribution
     - Role-based access control
@@ -38,182 +38,168 @@ securityDefinitions:
     name: X-Wallet-Address
 
 paths:
-  # Lock API Paths
-  /lock/deploy:
+  # Token API Paths
+  /token/initialize:
     post:
       tags:
-        - Lock
-      summary: Deploy full token set
+        - Token
+      summary: Initialize new token
       description: |
-        Creates new Security, DAO, and ART tokens.
-        Requires admin role.
-        Names will be suffixed with token type:
-          - Security: "{name} - Security" / "{symbol}.S"
-          - DAO: "{name} - Decentralized Autonomous Organization" / "{symbol}.DAO"
-          - ART: "{name} - Asset Referenced Token" / "{symbol}.ART"
+        Initialize a new token with specified parameters.
+        Can only be called once per token contract.
       parameters:
         - in: body
-          name: deployParams
           required: true
-          schema:
-            $ref: '#/definitions/DeployParams'
-      responses:
-        200:
-          description: Tokens deployed successfully
-          schema:
-            $ref: '#/definitions/ContractsInfo'
-        400:
-          description: Symbol already exists
-          schema:
-            $ref: '#/definitions/Error'
-        401:
-          description: Not authorized
-          schema:
-            $ref: '#/definitions/Error'
-
-  /lock/deployART:
-    post:
-      tags:
-        - Lock
-      summary: Deploy standalone ART token
-      description: |
-        Creates only an ART token without Security and DAO tokens.
-        Requires admin role.
-      parameters:
-        - in: body
-          name: deployParams
-          required: true
-          schema:
-            $ref: '#/definitions/DeployParams'
-      responses:
-        200:
-          description: ART token deployed successfully
+          name: initializeParams
           schema:
             type: object
             properties:
-              art:
+              decimals:
+                type: integer
+                example: 18
+              defaultAdmin:
                 $ref: '#/definitions/Address'
+              radao:
+                $ref: '#/definitions/Address'
+              isRadaoSupplier:
+                type: boolean
+                description: If true, Radao gets SUPPLY_ROLE
+      responses:
+        200:
+          description: Token initialized successfully
         400:
-          description: Symbol already exists
-          schema:
-            $ref: '#/definitions/Error'
-        401:
-          description: Not authorized
+          description: Already initialized
           schema:
             $ref: '#/definitions/Error'
 
-  /lock/exists/{symbol}:
+  /token/info/{address}:
     get:
       tags:
-        - Lock
-      summary: Check symbol existence
-      description: Verifies if a symbol is already in use
+        - Token
+      summary: Get token information
       parameters:
-        - name: symbol
+        - name: address
           in: path
           required: true
-          type: string
+          schema:
+            $ref: '#/definitions/Address'
       responses:
         200:
-          description: Existence check result
+          description: Token information
           schema:
-            type: boolean
-
-  /lock/contracts/{symbol}:
-    get:
-      tags:
-        - Lock
-      summary: Get contracts for symbol
-      description: Get addresses of all tokens in a set
-      parameters:
-        - name: symbol
-          in: path
-          required: true
-          type: string
-      responses:
-        200:
-          description: Contract addresses
-          schema:
-            $ref: '#/definitions/ContractsInfo'
+            $ref: '#/definitions/TokenInfo'
         404:
-          description: Unknown symbol
+          description: Token not found
           schema:
             $ref: '#/definitions/Error'
 
-  /lock/setName:
+  /token/transfer:
     post:
       tags:
-        - Lock
-      summary: Update token set names
-      description: |
-        Updates names and symbols for all tokens in a set.
-        Requires admin role.
-        Suffixes will be maintained.
+        - Token
+      summary: Transfer tokens
+      description: Transfer tokens to another address
       parameters:
         - in: body
-          name: nameParams
           required: true
+          name: transferParams
           schema:
-            $ref: '#/definitions/NameUpdateParams'
+            type: object
+            properties:
+              address:
+                $ref: '#/definitions/Address'
+              to:
+                $ref: '#/definitions/Address'
+              amount:
+                $ref: '#/definitions/Wei'
       responses:
         200:
-          description: Names updated successfully
-        400:
-          description: Unknown symbol
-          schema:
-            $ref: '#/definitions/Error'
-        401:
-          description: Not authorized
-          schema:
-            $ref: '#/definitions/Error'
-
-  /lock/lock:
-    post:
-      tags:
-        - Lock
-      summary: Lock security tokens
-      description: |
-        Locks security tokens to receive DAO and ART tokens.
-        Requires security token approval.
-        Emits Lock event.
-      parameters:
-        - in: body
-          name: lockParams
-          required: true
-          schema:
-            $ref: '#/definitions/LockParams'
-      responses:
-        200:
-          description: Tokens locked successfully
+          description: Transfer successful
           schema:
             $ref: '#/definitions/TransactionResponse'
         400:
-          description: Lock failed
+          description: Transfer failed
           schema:
             $ref: '#/definitions/Error'
 
-  /lock/unlock:
+  /token/approve:
     post:
       tags:
-        - Lock
-      summary: Unlock security tokens
-      description: |
-        Burns DAO and ART tokens to retrieve security tokens.
-        Requires DAO and ART token approval.
-        Emits Unlock event.
+        - Token
+      summary: Approve spender
+      description: Approve address to spend tokens
       parameters:
         - in: body
-          name: unlockParams
           required: true
+          name: approveParams
           schema:
-            $ref: '#/definitions/UnlockParams'
+            type: object
+            properties:
+              address:
+                $ref: '#/definitions/Address'
+              spender:
+                $ref: '#/definitions/Address'
+              amount:
+                $ref: '#/definitions/Wei'
       responses:
         200:
-          description: Tokens unlocked successfully
+          description: Approval successful
           schema:
             $ref: '#/definitions/TransactionResponse'
         400:
-          description: Unlock failed
+          description: Approval failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  /token/allowance:
+    get:
+      tags:
+        - Token
+      summary: Get token allowance
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+        - name: owner
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+        - name: spender
+          in: query
+          required: true
+          schema:
+            $ref: '#/definitions/Address'
+      responses:
+        200:
+          description: Current allowance
+          schema:
+            type: object
+            properties:
+              allowance:
+                $ref: '#/definitions/Wei'
+
+  /token/permit:
+    post:
+      tags:
+        - Token
+      summary: Submit permit signature
+      description: EIP-2612 permit for gasless approvals
+      parameters:
+        - in: body
+          required: true
+          name: permitParams
+          schema:
+            $ref: '#/definitions/PermitRequest'
+      responses:
+        200:
+          description: Permit successful
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Invalid permit
           schema:
             $ref: '#/definitions/Error'
 
@@ -485,6 +471,185 @@ paths:
           schema:
             $ref: '#/definitions/Error'
 
+  # Lock API Paths
+  /lock/deploy:
+    post:
+      tags:
+        - Lock
+      summary: Deploy full token set
+      description: |
+        Creates new Security, DAO, and ART tokens.
+        Requires admin role.
+        Names will be suffixed with token type:
+          - Security: "{name} - Security" / "{symbol}.S"
+          - DAO: "{name} - Decentralized Autonomous Organization" / "{symbol}.DAO"
+          - ART: "{name} - Asset Referenced Token" / "{symbol}.ART"
+      parameters:
+        - in: body
+          name: deployParams
+          required: true
+          schema:
+            $ref: '#/definitions/DeployParams'
+      responses:
+        200:
+          description: Tokens deployed successfully
+          schema:
+            $ref: '#/definitions/ContractsInfo'
+        400:
+          description: Symbol already exists
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/deployART:
+    post:
+      tags:
+        - Lock
+      summary: Deploy standalone ART token
+      description: |
+        Creates only an ART token without Security and DAO tokens.
+        Requires admin role.
+      parameters:
+        - in: body
+          name: deployParams
+          required: true
+          schema:
+            $ref: '#/definitions/DeployParams'
+      responses:
+        200:
+          description: ART token deployed successfully
+          schema:
+            type: object
+            properties:
+              art:
+                $ref: '#/definitions/Address'
+        400:
+          description: Symbol already exists
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/exists/{symbol}:
+    get:
+      tags:
+        - Lock
+      summary: Check symbol existence
+      description: Verifies if a symbol is already in use
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          type: string
+      responses:
+        200:
+          description: Existence check result
+          schema:
+            type: boolean
+
+  /lock/contracts/{symbol}:
+    get:
+      tags:
+        - Lock
+      summary: Get contracts for symbol
+      description: Get addresses of all tokens in a set
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          type: string
+      responses:
+        200:
+          description: Contract addresses
+          schema:
+            $ref: '#/definitions/ContractsInfo'
+        404:
+          description: Unknown symbol
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/setName:
+    post:
+      tags:
+        - Lock
+      summary: Update token set names
+      description: |
+        Updates names and symbols for all tokens in a set.
+        Requires admin role.
+        Suffixes will be maintained.
+      parameters:
+        - in: body
+          name: nameParams
+          required: true
+          schema:
+            $ref: '#/definitions/NameUpdateParams'
+      responses:
+        200:
+          description: Names updated successfully
+        400:
+          description: Unknown symbol
+          schema:
+            $ref: '#/definitions/Error'
+        401:
+          description: Not authorized
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/lock:
+    post:
+      tags:
+        - Lock
+      summary: Lock security tokens
+      description: |
+        Locks security tokens to receive DAO and ART tokens.
+        Requires security token approval.
+        Emits Lock event.
+      parameters:
+        - in: body
+          name: lockParams
+          required: true
+          schema:
+            $ref: '#/definitions/LockParams'
+      responses:
+        200:
+          description: Tokens locked successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Lock failed
+          schema:
+            $ref: '#/definitions/Error'
+
+  /lock/unlock:
+    post:
+      tags:
+        - Lock
+      summary: Unlock security tokens
+      description: |
+        Burns DAO and ART tokens to retrieve security tokens.
+        Requires DAO and ART token approval.
+        Emits Unlock event.
+      parameters:
+        - in: body
+          name: unlockParams
+          required: true
+          schema:
+            $ref: '#/definitions/UnlockParams'
+      responses:
+        200:
+          description: Tokens unlocked successfully
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        400:
+          description: Unlock failed
+          schema:
+            $ref: '#/definitions/Error'
+
   # Staker API Paths
   /staker/deploy:
     post:
@@ -702,171 +867,6 @@ paths:
             $ref: '#/definitions/RewardResult'
         400:
           description: Reward addition failed
-          schema:
-            $ref: '#/definitions/Error'
-
-  # Token API Paths
-  /token/initialize:
-    post:
-      tags:
-        - Token
-      summary: Initialize new token
-      description: |
-        Initialize a new token with specified parameters.
-        Can only be called once per token contract.
-      parameters:
-        - in: body
-          required: true
-          name: initializeParams
-          schema:
-            type: object
-            properties:
-              decimals:
-                type: integer
-                example: 18
-              defaultAdmin:
-                $ref: '#/definitions/Address'
-              radao:
-                $ref: '#/definitions/Address'
-              isRadaoSupplier:
-                type: boolean
-                description: If true, Radao gets SUPPLY_ROLE
-      responses:
-        200:
-          description: Token initialized successfully
-        400:
-          description: Already initialized
-          schema:
-            $ref: '#/definitions/Error'
-
-  /token/info/{address}:
-    get:
-      tags:
-        - Token
-      summary: Get token information
-      parameters:
-        - name: address
-          in: path
-          required: true
-          schema:
-            $ref: '#/definitions/Address'
-      responses:
-        200:
-          description: Token information
-          schema:
-            $ref: '#/definitions/TokenInfo'
-        404:
-          description: Token not found
-          schema:
-            $ref: '#/definitions/Error'
-
-  /token/transfer:
-    post:
-      tags:
-        - Token
-      summary: Transfer tokens
-      description: Transfer tokens to another address
-      parameters:
-        - in: body
-          required: true
-          name: transferParams
-          schema:
-            type: object
-            properties:
-              address:
-                $ref: '#/definitions/Address'
-              to:
-                $ref: '#/definitions/Address'
-              amount:
-                $ref: '#/definitions/Wei'
-      responses:
-        200:
-          description: Transfer successful
-          schema:
-            $ref: '#/definitions/TransactionResponse'
-        400:
-          description: Transfer failed
-          schema:
-            $ref: '#/definitions/Error'
-
-  /token/approve:
-    post:
-      tags:
-        - Token
-      summary: Approve spender
-      description: Approve address to spend tokens
-      parameters:
-        - in: body
-          required: true
-          name: approveParams
-          schema:
-            type: object
-            properties:
-              address:
-                $ref: '#/definitions/Address'
-              spender:
-                $ref: '#/definitions/Address'
-              amount:
-                $ref: '#/definitions/Wei'
-      responses:
-        200:
-          description: Approval successful
-          schema:
-            $ref: '#/definitions/TransactionResponse'
-        400:
-          description: Approval failed
-          schema:
-            $ref: '#/definitions/Error'
-
-  /token/allowance:
-    get:
-      tags:
-        - Token
-      summary: Get token allowance
-      parameters:
-        - name: address
-          in: query
-          required: true
-          schema:
-            $ref: '#/definitions/Address'
-        - name: owner
-          in: query
-          required: true
-          schema:
-            $ref: '#/definitions/Address'
-        - name: spender
-          in: query
-          required: true
-          schema:
-            $ref: '#/definitions/Address'
-      responses:
-        200:
-          description: Current allowance
-          schema:
-            type: object
-            properties:
-              allowance:
-                $ref: '#/definitions/Wei'
-
-  /token/permit:
-    post:
-      tags:
-        - Token
-      summary: Submit permit signature
-      description: EIP-2612 permit for gasless approvals
-      parameters:
-        - in: body
-          required: true
-          name: permitParams
-          schema:
-            $ref: '#/definitions/PermitRequest'
-      responses:
-        200:
-          description: Permit successful
-          schema:
-            $ref: '#/definitions/TransactionResponse'
-        400:
-          description: Invalid permit
           schema:
             $ref: '#/definitions/Error'
 
