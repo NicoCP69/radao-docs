@@ -2,49 +2,36 @@
 <html>
   <head>
     <title>Radao API Documentation</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@4.15.5/swagger-ui.css"
+    />
     <style>
       body {
-        font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
-        background-color: #f4f4f4;
+        font-family: Arial, sans-serif;
       }
-
-      .container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 40px;
-        background-color: white;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-      }
-
-      h1 {
-        text-align: center;
-        margin-bottom: 30px;
-      }
-
-      .swagger-link {
-        display: block;
-        text-align: center;
-        font-size: 18px;
-        color: #007bff;
-        text-decoration: none;
-        margin-top: 20px;
-      }
-
-      .swagger-link:hover {
-        color: #0056b3;
+      #swagger-ui {
+        height: 100vh;
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>Radao API Documentation</h1>
-      <p>
-        Welcome to the Radao API documentation. You can access the Swagger specification file by
-        clicking the link below.
-      </p>
-      <a href="swagger.yaml" class="swagger-link">View Swagger Documentation</a>
-    </div>
+    <div id="swagger-ui"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@4.15.5/swagger-ui-bundle.js"></script>
+    <script>
+      window.onload = function () {
+        const ui = SwaggerUI({
+          url: 'swagger.yaml',
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+        });
+      };
+    </script>
   </body>
 </html>
